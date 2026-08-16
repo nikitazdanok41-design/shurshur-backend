@@ -4,12 +4,17 @@ const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
+
+// Добавляем настройки CORS, чтобы сервер принимал запросы с твоего GitHub Pages
 const io = new Server(server, {
-    cors: { origin: "*" } // Разрешаем подключение с любых локальных адресов
+    cors: {
+        origin: "*", // Разрешает любые внешние адреса сайтов
+        methods: ["GET", "POST"]
+    }
 });
 
-// Имитация базы данных в памяти сервера (в продакшене тут должна быть СУБД)
-const users = {}; // { phone: { password, socketId } }
+// Имитация базы данных в памяти сервера
+const users = {}; 
 
 io.on('connection', (socket) => {
     console.log(`Пользователь подключился: ${socket.id}`);
@@ -20,7 +25,7 @@ io.on('connection', (socket) => {
             if (users[phone].password !== password) {
                 return socket.emit('auth_response', { success: false, message: 'Неверный пароль!' });
             }
-            users[phone].socketId = socket.id; // Обновляем сокет активного юзера
+            users[phone].socketId = socket.id; 
             console.log(`[ShurShur] Вход: ${phone}`);
         } else {
             users[phone] = { password, socketId: socket.id };
@@ -30,7 +35,7 @@ io.on('connection', (socket) => {
         socket.emit('auth_response', { success: true, phone });
     });
 
-    // 2. Поиск пользователя по номеру телефона (как в WhatsApp)
+    // 2. Поиск пользователя по номеру телефона
     socket.on('search_contact', (targetPhone) => {
         if (users[targetPhone]) {
             socket.emit('search_response', { exists: true, phone: targetPhone });
@@ -43,7 +48,6 @@ io.on('connection', (socket) => {
     socket.on('send_msg', ({ to, encryptedText, time }) => {
         const recipient = users[to];
         if (recipient && recipient.socketId) {
-            // Пересылаем сообщение напрямую на сокет получателя
             io.to(recipient.socketId).emit('receive_msg', {
                 from: socket.phone,
                 encryptedText,
@@ -63,7 +67,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Отключение
     socket.on('disconnect', () => {
         if (socket.phone && users[socket.phone]) {
             users[socket.phone].socketId = null;
@@ -72,9 +75,8 @@ io.on('connection', (socket) => {
     });
 });
 
-// Railway автоматически передаст нужный порт. Если его нет, запустится на 3000 локально.
+// Автоматический порт для Railway
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
     console.log(`Сервер ShurShur Messenger запущен на порту ${PORT}`);
 });
